@@ -1,0 +1,7 @@
+{
+  "name": "CycleLift Pro",
+  "description": "A high-performance weightlifting tracker featuring cyclical rep ranges and a 2D navigation system for seamless workout planning and tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
