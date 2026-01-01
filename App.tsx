@@ -6,7 +6,8 @@ import {
   X, Check, GripVertical, LayoutGrid, ArrowLeft, BrainCircuit, 
   Loader2, Target, Dumbbell, Timer, LogOut, User as UserIcon, 
   CloudCheck, CloudUpload, LogIn, Mail, Fingerprint, Download, Upload, ShieldCheck,
-  Search, MoreVertical, RefreshCw, UserCircle, TrendingUp, Scissors, Flame
+  Search, MoreVertical, RefreshCw, UserCircle, TrendingUp, Scissors, Flame,
+  Share, Smartphone
 } from 'lucide-react';
 import { DayWorkout, Exercise, AppState, SetRecord, UserPlan, Program, User } from './types';
 import { analyzeProgress, generateAiProgram } from './services/geminiService';
@@ -54,6 +55,57 @@ const App: React.FC = () => {
   } | null>(null);
 
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  // PWA Install prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    // Check if running as standalone PWA
+    const standalone = window.matchMedia('(display-mode: standalone)').matches 
+      || (window.navigator as any).standalone === true;
+    setIsStandalone(standalone);
+
+    // Detect iOS
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setIsIOS(iOS);
+
+    // Show install banner if not already installed and not dismissed
+    const dismissed = localStorage.getItem('pwa_install_dismissed');
+    if (!standalone && !dismissed) {
+      // Delay showing the banner
+      const timer = setTimeout(() => setShowInstallBanner(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Listen for beforeinstallprompt (Chrome/Edge/Android)
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    }
+  };
+
+  const dismissInstallBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('pwa_install_dismissed', 'true');
+  };
 
   useEffect(() => {
     localStorage.setItem('cyclelift_v3_data', JSON.stringify(state));
@@ -501,6 +553,47 @@ const App: React.FC = () => {
         </div>
       )}
       {renderModal()}
+      
+      {/* PWA Install Banner */}
+      {showInstallBanner && !isStandalone && (
+        <div className="fixed bottom-20 left-4 right-4 z-[90] animate-in slide-in-from-bottom duration-500">
+          <div className="bg-neutral-900 border border-emerald-500/30 rounded-3xl p-4 shadow-2xl shadow-emerald-500/10">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-emerald-500/10 rounded-2xl shrink-0">
+                <Smartphone className="text-emerald-400" size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-black text-white uppercase tracking-tight mb-1">Install App</h3>
+                {isIOS ? (
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Tap <Share size={12} className="inline text-blue-400 mx-1" /> then <span className="text-white font-semibold">"Add to Home Screen"</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Get the full app experience with offline support
+                  </p>
+                )}
+              </div>
+              <button 
+                onClick={dismissInstallBanner} 
+                className="p-2 text-neutral-600 hover:text-white shrink-0"
+                aria-label="Dismiss"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {!isIOS && deferredPrompt && (
+              <button 
+                onClick={handleInstallClick}
+                className="w-full mt-3 py-3 bg-emerald-500 text-black font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+              >
+                <Download size={16} strokeWidth={3} />
+                Install Now
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
