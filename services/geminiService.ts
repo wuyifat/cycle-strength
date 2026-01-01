@@ -2,7 +2,19 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DayWorkout, Program, UserPlan } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization to avoid crash when API key is not set
+let ai: GoogleGenAI | null = null;
+
+const getAI = () => {
+  if (!ai) {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("Gemini API Key not configured. AI features are unavailable.");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 /**
  * Analyzes progress for a specific day and the overall program trajectory.
@@ -40,7 +52,7 @@ export const analyzeProgress = async (program: Program, currentWorkout: DayWorko
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model,
       contents: prompt,
       config: {
@@ -51,7 +63,7 @@ export const analyzeProgress = async (program: Program, currentWorkout: DayWorko
     return response.text || "Analysis complete. Keep up the high intensity.";
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    return "Analysis service temporarily unavailable. Stay focused on your rep ranges.";
+    return "AI analysis unavailable. Please configure API key or stay focused on your rep ranges.";
   }
 };
 
@@ -87,7 +99,7 @@ export const generateAiProgram = async (goal: string, experience: string, daysPe
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model,
       contents: prompt,
       config: {
